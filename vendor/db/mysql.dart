@@ -120,6 +120,45 @@ class DB {
     await conn.close();
     _conditions.clear();
   }
+
+  static Future<void> migrate(Schema schema) async {
+    final conn = await DbConnector().connect();
+    await conn.query(schema.build());
+    await conn.close();
+  }
+}
+
+class Schema {
+  final String _table;
+  List<String> _columns = [];
+
+  Schema.create(this._table, void Function(Blueprint table) builder) {
+    var table = Blueprint();
+    builder(table);
+    _columns = table.columns;
+  }
+
+  String build() {
+    return 'CREATE TABLE $_table (${_columns.join(', ')});';
+  }
+}
+
+class Blueprint {
+  List<String> columns = [];
+
+  void id() {
+    columns.add('id INT PRIMARY KEY AUTO_INCREMENT');
+  }
+
+  void string(String name) {
+    columns.add('$name VARCHAR(255)');
+  }
+
+  void timestamps() {
+    columns.add('created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    columns.add(
+        'updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+  }
 }
 
 void main() async {
@@ -146,4 +185,11 @@ void main() async {
 
   print(users);
   print(users.length);
+
+  await DB.migrate(Schema.create('flights', (table) {
+    table.id();
+    table.string('name');
+    table.string('airline');
+    table.timestamps();
+  }));
 }
