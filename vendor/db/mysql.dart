@@ -8,6 +8,8 @@ class DB {
   static String? _orderByField;
   static String? _orderByDirection;
   static int? _limit;
+  static String? _groupByField;
+  static String? _groupByRaw;
 
   static DB table(String tableName) {
     _table = tableName;
@@ -53,6 +55,14 @@ class DB {
       }
     }
 
+    if (_groupByField != null) {
+      query += ' GROUP BY $_groupByField';
+    }
+
+    if (_groupByRaw != null) {
+      query += ' GROUP BY $_groupByRaw';
+    }
+
     if (_orderByField != null && _orderByDirection != null) {
       query += ' ORDER BY $_orderByField $_orderByDirection';
     }
@@ -70,7 +80,8 @@ class DB {
     _orderByField = null;
     _orderByDirection = null;
     _limit = null;
-
+    _groupByField = null;
+    _groupByRaw = null;
     return results.toList();
   }
 
@@ -121,6 +132,23 @@ class DB {
     _conditions.clear();
   }
 
+  DB groupBy(String field) {
+    _groupByField = field;
+    return this;
+  }
+
+  DB groupByRaw(String rawQuery) {
+    _groupByRaw = rawQuery;
+    return this;
+  }
+
+  static Future<List<ResultRow>> query(String rawQuery) async {
+    final conn = await DbConnector().connect();
+    var results = await conn.query(rawQuery);
+    await conn.close();
+    return results.toList();
+  }
+
   static Future<void> migrate(Schema schema) async {
     final conn = await DbConnector().connect();
     await conn.query(schema.build());
@@ -165,31 +193,36 @@ void main() async {
   List<ResultRow> users = await DB
       .table('users')
       .where('age', '>=', 22)
+      // .groupBy('id')
+      .groupByRaw('name, id')
       .orderBy("id", "desc")
       .limit(1)
       .get();
+  for (var user in users) {
+    print(user["name"]);
+  }
 
-  var lastInsertId = await DB.table('users').insert({
-    "name": "Alex",
-    "email": "alex@gmail.com",
-    "age": 23,
-  });
+  List<ResultRow> users2 = await DB.query("select * from users LIMIT 1");
+  print(users2);
 
-  await DB.table('users').where("id", "=", lastInsertId).update({
-    "name": "Budi",
-    "email": "alex@gmail.com",
-    "age": 23,
-  });
+  // var lastInsertId = await DB.table('users').insert({
+  //   "name": "Alex",
+  //   "email": "alex@gmail.com",
+  //   "age": 23,
+  // });
 
-  await DB.table('users').where("id", "=", lastInsertId).delete();
+  // await DB.table('users').where("id", "=", lastInsertId).update({
+  //   "name": "Budi",
+  //   "email": "alex@gmail.com",
+  //   "age": 23,
+  // });
 
-  print(users);
-  print(users.length);
+  // await DB.table('users').where("id", "=", lastInsertId).delete();
 
-  await DB.migrate(Schema.create('flights', (table) {
-    table.id();
-    table.string('name');
-    table.string('airline');
-    table.timestamps();
-  }));
+  // // await DB.migrate(Schema.create('flights', (table) {
+  // //   table.id();
+  // //   table.string('name');
+  // //   table.string('airline');
+  // //   table.timestamps();
+  // // }));
 }
